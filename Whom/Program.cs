@@ -9,6 +9,7 @@ namespace Whom
 {
     class Program
     {
+
         static void Main(string[] args)
         {
             ExchangeService service = new ExchangeService(ExchangeVersion.Exchange2013_SP1);
@@ -19,11 +20,15 @@ namespace Whom
             service.Url = new Uri(@"https://outlook.live.com/EWS/Exchange.asmx");
             
             Folder inbox = Folder.Bind(service, WellKnownFolderName.Inbox);
+            //EmailMessage firstItem = inbox.FindItems(new ItemView(1)).First() as EmailMessage;
+
+            
+
 
             //ResetRules(service);
 
             //ResetInbox(inbox);
-            //OrganizeInbox(inbox);
+            OrganizeInbox(service, inbox);
             
             Console.WriteLine("welp, see ya!");
             var bye = Console.ReadKey();
@@ -114,10 +119,10 @@ namespace Whom
 
         }
 
-        private static void OrganizeInbox(Folder inbox)
+        private static void OrganizeInbox(ExchangeService service, Folder inbox)
         {
 
-            ItemView itemView = new ItemView(1000);
+            ItemView itemView = new ItemView(10000);
             itemView.OrderBy.Add(EmailMessageSchema.DateTimeReceived, SortDirection.Descending);
             
             Grouping g = new Grouping();
@@ -127,9 +132,9 @@ namespace Whom
             g.AggregateType = AggregateType.Minimum;
             g.SortDirection = SortDirection.Descending;
 
-            SearchFilter.ContainsSubstring searchFilter = new SearchFilter.ContainsSubstring(EmailMessageSchema.Sender, "Nootrobox Club", ContainmentMode.Substring, ComparisonMode.IgnoreCaseAndNonSpacingCharacters);
+            SearchFilter.ContainsSubstring searchFilter = new SearchFilter.ContainsSubstring(EmailMessageSchema.From, "Nootrobox Club", ContainmentMode.Substring, ComparisonMode.IgnoreCaseAndNonSpacingCharacters);
             
-            var groups = inbox.FindItems(searchFilter, itemView,g);
+            var groups = inbox.FindItems( itemView,g);
             
             
 
@@ -146,16 +151,87 @@ namespace Whom
                 //Console.WriteLine("{0} {1}", groupName, groupAggregate);
                                                
                 Console.WriteLine("{0} {1}", email.Sender, email.DateTimeReceived);
-                
-                var associatedAddress = from EmailMessage item in items
-                                        group item by item.Sender into g2
-                                        select g2;
+                Console.WriteLine("\t{0}", email.Subject);
 
-                foreach(var addy in associatedAddress)
-                {
-                    Console.WriteLine("\t{0} ({1})", addy.Key, addy.Count());
-                }
+                //SearchFilter folderFilter = new SearchFilter.ContainsSubstring();
+
+                //Folder senderFolder = GetSenderFolder(service, inbox, email.Sender.Name);
+
+                //var associatedAddress = from EmailMessage item in items
+                //                        group item.Sender by item.Sender.Address into g2
+                //                        select g2.FirstOrDefault();
+
+                //foreach (var addy in associatedAddress)
+                //{
+                    
+                //    Rule senderRule = GetSenderRule(service, addy, senderFolder);
+                //    Console.WriteLine("\t{0} ({1})", addy, items.Count(i=>(i as EmailMessage).Sender.Address == addy.Address));
+                //}
+
+
+                //var itemIds = from EmailMessage item in items
+                //              select item.Id;
+
+
+                //service.MoveItems(itemIds, senderFolder.Id);
+
             }
+        }
+
+        public static Rule GetSenderRule(ExchangeService service, EmailAddress sender, Folder senderFolder)
+        {
+            Rule rule = null;
+            var rules = service.GetInboxRules();
+            rule = rules.SingleOrDefault(r => r.DisplayName == sender.Name);
+            RuleOperation op;
+            if (rule == null)
+            {
+                rule = new Rule();
+                rule.DisplayName = sender.Name;
+                op = new CreateRuleOperation(rule);
+            } else
+            {
+                op = new SetRuleOperation(rule);
+            }
+
+            if (!rule.Conditions.ContainsSenderStrings.Contains(sender.Name))
+            {
+                rule.Conditions.ContainsSenderStrings.Add(sender.Name);
+            }
+
+            if (!rule.Conditions.FromAddresses.Contains(sender))
+            {
+                rule.Conditions.FromAddresses.Add(sender);
+            }
+
+            if (rule.Actions.MoveToFolder == null || rule.Actions.MoveToFolder != senderFolder.Id)
+            {
+                rule.Actions.MoveToFolder = senderFolder.Id;
+            }
+
+            rule.Actions.StopProcessingRules = true;
+
+            
+            service.UpdateInboxRules(new RuleOperation[] { op }, true);
+            
+            return rule;
+        }
+
+        public static Folder GetSenderFolder(ExchangeService service,Folder parent, string sender)
+        {
+            Folder folder = null;
+            var folderName = string.Join(".", sender.Split('.').Reverse());
+
+            folder = parent.FindFolders(new SearchFilter.ContainsSubstring(FolderSchema.DisplayName, folderName), new FolderView(1)).SingleOrDefault();
+
+            if (folder == null)
+            {
+                folder = new Folder(service);
+                folder.DisplayName = folderName;
+                folder.Save(parent.Id);
+            }
+
+            return folder;
         }
     }
 }
