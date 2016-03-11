@@ -9,16 +9,23 @@
     <p><a href="http://asp.net" class="btn btn-primary btn-lg">Learn more &raquo;</a></p>
 </div>
 
+<div class="list-group">
 
-@foreach (var s in Model)
-{
-    <div class="row">
-        <div class="col-md-2 col-md-offset-1">
-            @s.name
+    @foreach (var s in Model)
+    {
+        <div class="list-group-item@(s.name==Model.First().name ? " active" : "")">
+            <div class="list-group-item-heading">@s.name <span class="badge">@s.messages.Count()</span> <span class="text-muted">@s.recieved</span></div>
+            <div class="list-group-item-text">@s.subject</div>
         </div>
-        <div class="col-md-2">
-            (@s.recieved)
-        </div>
-    </div>
-}
-
+        @*<div class="row">
+                <div class="col-md-12">
+                    @s.name (@s.messages.Count()) @s.recieved
+                    <div class="row">
+                        <div class="col-md-offset-1">
+                            @s.subject
+                        </div>
+                    </div>
+                </div>
+            </div>*@
+        }
+</div>
