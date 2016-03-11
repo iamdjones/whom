@@ -7,19 +7,26 @@ using Microsoft.Exchange.WebServices.Data;
 
 namespace Whom
 {
-    class Program
+    public class Program
     {
+        public static ExchangeService service;
+        public static Folder inbox;
 
+        static Program()
+        {
+            service = new ExchangeService(ExchangeVersion.Exchange2013_SP1);
+            service.Credentials = new WebCredentials("djones9898@hotmail.com", "Fatboyz69");
+            service.Url = new Uri(@"https://outlook.live.com/EWS/Exchange.asmx");
+
+            inbox = Folder.Bind(service, WellKnownFolderName.Inbox);
+
+        }
         static void Main(string[] args)
         {
-            ExchangeService service = new ExchangeService(ExchangeVersion.Exchange2013_SP1);
-            service.Credentials = new WebCredentials("djones9898@hotmail.com", "Fatboyz69");
 
             //service.TraceEnabled = true;
             //service.TraceFlags = TraceFlags.All;
-            service.Url = new Uri(@"https://outlook.live.com/EWS/Exchange.asmx");
             
-            Folder inbox = Folder.Bind(service, WellKnownFolderName.Inbox);
             //EmailMessage firstItem = inbox.FindItems(new ItemView(1)).First() as EmailMessage;
 
             
@@ -33,6 +40,54 @@ namespace Whom
             Console.WriteLine("welp, see ya!");
             var bye = Console.ReadKey();
         }
+
+        public static List<Sender> IndexViewModel()
+        {
+
+            var viewModel = new List<Sender>();
+
+            ItemView itemView = new ItemView(10000);
+            itemView.OrderBy.Add(EmailMessageSchema.DateTimeReceived, SortDirection.Descending);
+
+            Grouping g = new Grouping();
+
+            g.GroupOn = EmailMessageSchema.From;
+            g.AggregateOn = EmailMessageSchema.DateTimeReceived;
+            g.AggregateType = AggregateType.Minimum;
+            g.SortDirection = SortDirection.Descending;
+
+            SearchFilter.ContainsSubstring searchFilter = new SearchFilter.ContainsSubstring(EmailMessageSchema.From, "Nootrobox Club", ContainmentMode.Substring, ComparisonMode.IgnoreCaseAndNonSpacingCharacters);
+
+            var groups = inbox.FindItems(itemView, g);
+
+
+
+            Console.WriteLine("Found {0} groups", groups.Count());
+
+            foreach (var group in groups)
+            {
+                var email = group.Items.First() as EmailMessage;
+                //var firstItem = item.Items.First();
+                var items = group.Items;
+                //var groupName = (item.Items.First() as EmailMessage).Sender;
+                //var groupAggregate = (item.Items.First() as EmailMessage).DateTimeReceived;
+
+                //Console.WriteLine("{0} {1}", groupName, groupAggregate);
+                var messages = group.Items;
+                var sender = new Sender();
+                sender.name = email.Sender.Name;
+                sender.messages.AddRange(from m in messages select new Message() { subject = m.Subject, recieved = m.DateTimeReceived });
+
+                viewModel.Add(sender);
+
+                Console.WriteLine("{0} {1}", email.Sender, email.DateTimeReceived);
+                Console.WriteLine("\t{0}", email.Subject);
+
+            }
+
+            return viewModel;
+        }
+
         private static bool RedirectionUrlValidationCallback(string redirectionUrl)
         {
             // The default for the validation callback is to reject the URL.
